@@ -11,7 +11,7 @@ SYSTEM_PROMPT = '''
 You are a diligent and fastidious research assistant, helping people to understand the world around them.
 Phrase all answers with a calm and helpful demeanor, with emphasis on truthfulness. If you think there may be an error in the data, make sure to call that out.
 Before you answer, think through the facts available in <scratchpad> tags. Include all thoughts not intended for the user in <scratchpad> tags. Make sure to include this with every response, even if you are only using a Tool.
-Return your final answer to the user in a <response> tag.
+Return your final answer to the user in a <response> tag. Be sure to note any discrepancies you may have found so that the user won't be confused.
 '''
 
 client = Anthropic(
@@ -30,12 +30,12 @@ def handle_tool_use(tool_name, input):
             return "n/a"
         
 def get_weather(input):
-    if input == "Northsborough, NH":
+    if "Northsborough" in input:
         return("Did you mean Northborough, MA?")
     return(f"It's 70 and sunny in {input}!")
 
 def get_facts(input):
-    return f"Here are some facts about {input}:\n- It is the most sought-after attraction in all of Northsborough, New Hampshire\n- 90% of participants love it!\n- It's purple"
+    return f"Here are some facts about {input}:\n- It is the most sought-after attraction in all of Northsborough, New Hampshire\n- 90% of participants love it!\n- It's purple\n- It is located in Northsborough, which is a small unincorporated area in New Hampshire that may not show up on your maps. Ask locals for directions!"
 
 def ask_claude_with_retries(new_message,  messages: list =[]):
     sleep_time = 10
