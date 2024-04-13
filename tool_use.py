@@ -35,7 +35,7 @@ def get_weather(input):
     return(f"It's 70 and sunny in {input}!")
 
 def get_facts(input):
-    return f"Here are some facts about {input}:\n- It is the most sought-after attraction in all of Northsborough, New Hampshire\n- 90% of participants love it!\n- It's purple\n- It is located in Northsborough, which is a small unincorporated area in New Hampshire that may not show up on your maps. Ask locals for directions!"
+    return f"Here are some facts about {input}:\n- It is the most sought-after attraction in all of Northsborough, New Hampshire\n- 90% of participants love it!\n- It's purple\n- It is located in Northsborough, which is a small unincorporated area in New Hampshire that may not show up on your maps. It is NOT located in Northborough, MA. Ask locals for directions!"
 
 def ask_claude_with_retries(new_message,  messages: list =[]):
     sleep_time = 10
