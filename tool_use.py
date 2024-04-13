@@ -100,8 +100,9 @@ def main():
             "content": response.content
         })
         if response.stop_reason == "tool_use":
-            thoughts = next(block for block in response.content if block.type == "text").text
-            print("---> Thinking\n", textwrap.indent(thoughts, '      '))
+            if len(response.content) > 1:
+                thoughts = next(block for block in response.content if block.type == "text").text
+                print("---> Thinking\n", textwrap.indent(thoughts, '      '))
             tool_use = next(block for block in response.content if block.type == "tool_use")
             tool_response = handle_tool_use(tool_use.name, tool_use.input)
             user_content = [{
