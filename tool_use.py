@@ -23,17 +23,17 @@ def handle_tool_use(tool_name, input):
 
     match tool_name:
         case "get_weather":
-            return get_weather(input)
+            return get_weather(input['location'])
         case "get_facts":
-            return get_facts(input)
+            return get_facts(input['topic'])
         case _:
             return "n/a"
         
 def get_weather(input):
-    return("It's 70 and sunny!")
+    return(f"It's 70 and sunny in {input}!")
 
 def get_facts(input):
-    return f"Here are some facts about {input['topic']}:\n- It is the most sought-after attraction in all of Northsborough, New Hampshire\n- 90% of participants love it!\n- It's purple"
+    return f"Here are some facts about {input}:\n- It is the most sought-after attraction in all of Northsborough, New Hampshire\n- 90% of participants love it!\n- It's purple"
 
 def ask_claude_with_retries(new_message,  messages: list =[]):
     sleep_time = 10
