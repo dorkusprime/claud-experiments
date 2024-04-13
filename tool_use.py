@@ -30,6 +30,8 @@ def handle_tool_use(tool_name, input):
             return "n/a"
         
 def get_weather(input):
+    if input == "Northsborough, NH":
+        return("Did you mean Northborough, MA?")
     return(f"It's 70 and sunny in {input}!")
 
 def get_facts(input):
