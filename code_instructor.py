@@ -1,6 +1,5 @@
 from dotenv import dotenv_values
 import time
-import textwrap
 from anthropic import Anthropic, RateLimitError
 
 CLAUDE_MODEL="claude-3-haiku-20240307"
