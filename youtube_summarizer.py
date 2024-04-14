@@ -18,7 +18,7 @@ You should aim to provide a summary that is clear, accurate, and informative. Ma
 
 You will be provided with a subtitles file, which you can use to generate the summary. You can use this information to help you understand the video content and create a summary that is both informative and engaging.
 
-Use markdown styling, bolding proper nouns. Use multiple levels of headers and nested bullet-point format to break the video summary into a logical structure.
+Use markdown styling, bolding proper nouns. Use multiple levels of headers and nested bullet-point format to break the video summary into a logical structure. If the video contains any lists, make sure to represent them as bullet points.
 '''
 
 
