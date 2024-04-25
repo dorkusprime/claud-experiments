@@ -2,12 +2,12 @@ from dotenv import dotenv_values
 import time
 from anthropic import Anthropic, RateLimitError
 
-CLAUDE_MODEL="claude-3-haiku-20240307"
-MAX_TOKENS=4096
-CONFIG = dotenv_values(".env") 
+CLAUDE_MODEL = "claude-3-haiku-20240307"
+MAX_TOKENS = 4096
+CONFIG = dotenv_values(".env")
 
 
-SYSTEM_PROMPT = '''
+SYSTEM_PROMPT = """
 "User: You are a Computer Science instructor. Your goal is to assist people with coding issues and teach them how to code.
 
 Use a professorial tone, guiding students in the right direction with explanations and examples.
@@ -34,14 +34,15 @@ There are a couple of issues with this sample. First, you must use double ""="" 
 Before you give your response, please make use of a <scratchpad> to think about it.
 
 Make sure to enter your response in <response> tags
-'''
+"""
 
 
 client = Anthropic(
     api_key=CONFIG["claude_key"],
 )
 
-def ask_claude_with_retries(new_message, messages: list =[]):
+
+def ask_claude_with_retries(new_message, messages: list = []):
     """
     Sends a message to Claude and retries in case of RateLimitError.
 
@@ -55,14 +56,15 @@ def ask_claude_with_retries(new_message, messages: list =[]):
     """
     sleep_time = 10
     while True:
-        try: 
+        try:
             return ask_claude(new_message, messages)
         except RateLimitError:
             print(f"Rate Limit Error. Sleeping {sleep_time}s")
             time.sleep(sleep_time)
             continue
 
-def ask_claude(new_message, messages: list =[]):
+
+def ask_claude(new_message, messages: list = []):
     """
     Sends a new message to Claude and returns the response.
 
@@ -75,20 +77,23 @@ def ask_claude(new_message, messages: list =[]):
     """
     new_messages = messages + [new_message]
     response = client.beta.tools.messages.create(
-        model = CLAUDE_MODEL,
-        max_tokens = 4096,
-        system=SYSTEM_PROMPT,
-        messages = new_messages
+        model=CLAUDE_MODEL, max_tokens=4096, system=SYSTEM_PROMPT, messages=new_messages
     )
     return response, new_messages
 
-file = open('tool_use.py','r')
+
+file = open("tool_use.py", "r")
 contents = file.read()
 file.close()
 
-response, _ = ask_claude({"role": "user", "content": [
-    {"type": "text", "text": contents},
-    {"type": "text", "text": "How would you respond to this student's code?"}
-]})
+response, _ = ask_claude(
+    {
+        "role": "user",
+        "content": [
+            {"type": "text", "text": contents},
+            {"type": "text", "text": "How would you respond to this student's code?"},
+        ],
+    }
+)
 
 print(response.content[0].text)

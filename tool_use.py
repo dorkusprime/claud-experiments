@@ -3,20 +3,21 @@ import time
 import textwrap
 from anthropic import Anthropic, RateLimitError
 
-CLAUDE_MODEL="claude-3-haiku-20240307"
-MAX_TOKENS=4096
-CONFIG = dotenv_values(".env") 
+CLAUDE_MODEL = "claude-3-haiku-20240307"
+MAX_TOKENS = 4096
+CONFIG = dotenv_values(".env")
 
-SYSTEM_PROMPT = '''
+SYSTEM_PROMPT = """
 You are a diligent and fastidious research assistant, helping people to understand the world around them.
 Phrase all answers with a calm and helpful demeanor, with emphasis on truthfulness. If you think there may be an error in the data, make sure to call that out.
 Before you answer, think through the facts available in <scratchpad> tags. Include all thoughts not intended for the user in <scratchpad> tags. Make sure to include this with every response, even if you are only using a Tool.
 Return your final answer to the user in a <response> tag. Be sure to note any discrepancies you may have found so that the user won't be confused.
-'''
+"""
 
 client = Anthropic(
     api_key=CONFIG["claude_key"],
 )
+
 
 def handle_tool_use(tool_name, input):
     """
@@ -37,12 +38,13 @@ def handle_tool_use(tool_name, input):
 
     match tool_name:
         case "get_weather":
-            return get_weather(input['location'])
+            return get_weather(input["location"])
         case "get_facts":
-            return get_facts(input['topic'])
+            return get_facts(input["topic"])
         case _:
             return "n/a"
-        
+
+
 def get_weather(input):
     """
     Get the weather information for a given location.
@@ -54,8 +56,9 @@ def get_weather(input):
     str: The weather information for the given location.
     """
     if "Northsborough" in input:
-        return("Did you mean Northborough, MA?")
-    return(f"It's 70 and sunny in {input}!")
+        return "Did you mean Northborough, MA?"
+    return f"It's 70 and sunny in {input}!"
+
 
 def get_facts(input):
     """
@@ -69,7 +72,8 @@ def get_facts(input):
     """
     return f"Here are some facts about {input}:\n- It is the most sought-after attraction in all of Northsborough, New Hampshire\n- 90% of participants love it!\n- It's purple\n- It is located in Northsborough, which is a small unincorporated area in New Hampshire that may not show up on your maps. It is NOT located in Northborough, MA. Ask locals for directions!"
 
-def ask_claude_with_retries(new_message, messages: list =[]):
+
+def ask_claude_with_retries(new_message, messages: list = []):
     """
     Sends a message to Claude and retries if a RateLimitError occurs.
 
@@ -83,13 +87,17 @@ def ask_claude_with_retries(new_message, messages: list =[]):
     sleep_time = 10
     while True:
         try:
+            raise RateLimitError(
+                "Rate Limit Error",
+            )
             return ask_claude(new_message, messages)
         except RateLimitError:
             print(f"Rate Limit Error. Sleeping {sleep_time}s")
             time.sleep(sleep_time)
             continue
 
-def ask_claude(new_message, messages: list =[]):
+
+def ask_claude(new_message, messages: list = []):
     """
     Sends a message to the Claude chatbot and retrieves the response.
 
@@ -102,10 +110,10 @@ def ask_claude(new_message, messages: list =[]):
     """
     new_messages = messages + [new_message]
     response = client.beta.tools.messages.create(
-        model = CLAUDE_MODEL,
-        max_tokens = 4096,
+        model=CLAUDE_MODEL,
+        max_tokens=4096,
         system=SYSTEM_PROMPT,
-        tools = [
+        tools=[
             {
                 "name": "get_weather",
                 "description": "Get the current weather in a given location",
@@ -135,9 +143,10 @@ def ask_claude(new_message, messages: list =[]):
                 },
             },
         ],
-        messages = new_messages
+        messages=new_messages,
     )
     return response, new_messages
+
 
 def main():
     """
@@ -155,32 +164,31 @@ def main():
     messages = []
     user_response = None
     while True:
-        new_message = {
-            "role": "user",
-            "content": user_content
-        }
+        new_message = {"role": "user", "content": user_content}
         response, messages = ask_claude_with_retries(new_message, messages)
-        messages.append({
-            "role": "assistant",
-            "content": response.content
-        })
+        messages.append({"role": "assistant", "content": response.content})
         if response.stop_reason == "tool_use":
             if len(response.content) > 1:
-                thoughts = next(block for block in response.content if block.type == "text").text
-                print("---> Thinking\n", textwrap.indent(thoughts, '      '))
-            tool_use = next(block for block in response.content if block.type == "tool_use")
+                thoughts = next(
+                    block for block in response.content if block.type == "text"
+                ).text
+                print("---> Thinking\n", textwrap.indent(thoughts, "      "))
+            tool_use = next(
+                block for block in response.content if block.type == "tool_use"
+            )
             tool_response = handle_tool_use(tool_use.name, tool_use.input)
-            user_content = [{
-                "type": "tool_result",
-                "tool_use_id": tool_use.id,
-                "content": tool_response
-            }]
+            user_content = [
+                {
+                    "type": "tool_result",
+                    "tool_use_id": tool_use.id,
+                    "content": tool_response,
+                }
+            ]
         else:
             user_response = response
             break
-            
-    print("response", str(response.content))
 
+    print("response", str(response.content))
 
 
 main()
