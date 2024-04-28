@@ -1,5 +1,6 @@
 import functools
 import logging
+import re
 from anthropic.types.beta.tools.tools_beta_message import ToolsBetaMessage
 import yt_dlp
 
@@ -22,14 +23,14 @@ MODEL_NAMES = {
     "opus": "claude-3-opus-20240229",
 }
 
-CLAUDE_MODEL = MODEL_NAMES["haiku"]
+CLAUDE_MODEL = MODEL_NAMES["opus"]
 
 SYSTEM_PROMPT = """
 User: You are a research assistant who summarizes videos for professors looking to create educational content. Your goal is to provide an exhaustive summary of the video content, highlighting key points and concepts.
 
 You should aim to provide a summary that is clear, accurate, and informative. Make sure to include any important details and proper nouns (company names, product names, etc) that may be relevant to the video's content.
 
-You will be provided with a subtitles file, which you can use to generate the summary. You can use this information to help you understand the video content and create a summary that is both informative and engaging. Make sure to summarize the entire video, not just parts of it.
+You will be provided with a subtitles file with its timing information removed, which you can use to generate the summary. You can use this information to help you understand the video content and create a summary that is both informative and engaging. Make sure to summarize the entire video, not just parts of it.
 
 Here are some rules for the interaction:
 <rules>
@@ -144,6 +145,38 @@ def ask_claude(new_message, messages: list = []):
     return response, new_messages
 
 
+def clean_captions(subtitles):
+    """
+    Cleans the given subtitles by removing unwanted patterns and duplicates.
+
+    Args:
+        subtitles (str): The subtitles to be cleaned.
+
+    Returns:
+        str: The cleaned subtitles.
+
+    """
+    cleaned_subtitles = subtitles
+    replacements = [
+        (r".*\d+:\d+:\d+\.\d+.*", ""),
+        ((r"\n+", "\n")),
+    ]
+    for old, new in replacements:
+        cleaned_subtitles = re.sub(old, new, cleaned_subtitles)
+
+    cleaned_subtitles_array = cleaned_subtitles.split("\n")
+    cleaned_subtitles_array = [i for i in cleaned_subtitles_array if i != " "]
+    deduped_subtitles_array = []
+    for index, line in enumerate(cleaned_subtitles_array):
+        if (
+            index > 0
+            and cleaned_subtitles_array[index] != cleaned_subtitles_array[index - 1]
+        ):
+            deduped_subtitles_array.append(line)
+
+    return "\n".join(deduped_subtitles_array)
+
+
 def download_captions(video_url):
     """
     Downloads the captions for a YouTube video.
@@ -167,9 +200,9 @@ def download_captions(video_url):
     logger.info(f"Downloading captions for {video_url}")
     res = ydl.extract_info(video_url, download=False)
     if res["requested_subtitles"] and res["requested_subtitles"]["en"]:
-        logger.debug(res["requested_subtitles"]["en"]["url"])
+        logger.debug(f'Subtitles URL: {res["requested_subtitles"]["en"]["url"]}')
         response = requests.get(res["requested_subtitles"]["en"]["url"], stream=True)
-        logger.debug(response.text)
+
         return response.text
     else:
         logger.error("This YouTube video does not have any English captions")
@@ -183,7 +216,7 @@ def main(video_url):
     new_message = {
         "role": "user",
         "content": [
-            {"type": "text", "text": captions},
+            {"type": "text", "text": clean_captions(captions)},
             {"type": "text", "text": "Can you summarize the video?"},
         ],
     }
