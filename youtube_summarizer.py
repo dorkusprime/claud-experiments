@@ -9,12 +9,20 @@ from dotenv import dotenv_values
 import time
 from anthropic import Anthropic, RateLimitError, InternalServerError
 
-CLAUDE_MODEL = "claude-3-sonnet-20240229"
 MAX_TOKENS = 4096
 CONFIG = dotenv_values(".env")
 
+logging.basicConfig()
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
+
+MODEL_NAMES = {
+    "haiku": "claude-3-haiku-20240307",
+    "sonnet": "claude-3-sonnet-20240229",
+    "opus": "claude-3-opus-20240229",
+}
+
+CLAUDE_MODEL = MODEL_NAMES["haiku"]
 
 SYSTEM_PROMPT = """
 User: You are a research assistant who summarizes videos for professors looking to create educational content. Your goal is to provide an exhaustive summary of the video content, highlighting key points and concepts.
@@ -115,6 +123,7 @@ def ask_claude(new_message, messages: list = []):
     Returns:
         tuple: A tuple containing the response from Claude and the updated list of messages.
     """
+    logger.info("Requesting summary from Claude")
     new_messages = messages + [new_message]
     response: ToolsBetaMessage = client.beta.tools.messages.create(
         model=CLAUDE_MODEL,
@@ -126,14 +135,26 @@ def ask_claude(new_message, messages: list = []):
 
 
 def download_captions(video_url):
+    """
+    Downloads the captions for a YouTube video.
+
+    Args:
+        video_url (str): The URL of the YouTube video.
+
+    Returns:
+        str: The downloaded captions as a string, or None if no English captions are available.
+    """
     ydl = yt_dlp.YoutubeDL(
         {
             "writesubtitles": True,
             "subtitleslangs": ["en"],
             "writeautomaticsub": True,
             "logtostderr": True,
+            "quiet": True,
+            "logger": logger,
         }
     )
+    logger.info(f"Downloading captions for {video_url}")
     res = ydl.extract_info(video_url, download=False)
     if res["requested_subtitles"] and res["requested_subtitles"]["en"]:
         logger.debug(res["requested_subtitles"]["en"]["url"])
@@ -141,7 +162,7 @@ def download_captions(video_url):
         logger.debug(response.text)
         return response.text
     else:
-        logger.error("This Youtube Video does not have any english captions")
+        logger.error("This YouTube video does not have any English captions")
         return None
 
 
