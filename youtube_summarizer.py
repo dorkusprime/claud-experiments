@@ -1,15 +1,20 @@
+import functools
+import logging
+from anthropic.types.beta.tools.tools_beta_message import ToolsBetaMessage
 import yt_dlp
 
 import requests
 import sys
 from dotenv import dotenv_values
 import time
-from anthropic import Anthropic, RateLimitError
+from anthropic import Anthropic, RateLimitError, InternalServerError
 
 CLAUDE_MODEL = "claude-3-sonnet-20240229"
 MAX_TOKENS = 4096
 CONFIG = dotenv_values(".env")
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 SYSTEM_PROMPT = """
 User: You are a research assistant who summarizes videos for professors looking to create educational content. Your goal is to provide an exhaustive summary of the video content, highlighting key points and concepts.
@@ -29,30 +34,76 @@ client = Anthropic(
 )
 
 
-def ask_claude_with_retries(new_message, messages: list = []):
+def with_retries(max_wait_time=float("inf")):
     """
-    Sends a message to Claude and retries in case of RateLimitError.
+    A decorator that adds retry functionality to a function.
 
     Args:
-        new_message (str): The new message to send to Claude.
-        messages (list, optional): List of previous messages. Defaults to an empty list.
+      max_wait_time (float, optional): The maximum wait time in seconds between retries. Defaults to infinity.
 
     Returns:
-        The response from ask_claude.
+      function: The decorated function.
 
     """
-    sleep_time = 10
-    while True:
-        try:
-            return ask_claude(new_message, messages)
-        except RateLimitError as e:
-            print(e, file=sys.stderr)
-            print(f"Rate Limit Error. Sleeping {sleep_time}s", file=sys.stderr)
 
-            time.sleep(sleep_time)
-            continue
+    def fibonacci_wait_times():
+        """
+        Generates Fibonacci numbers for wait times.
+
+        Yields the Fibonacci numbers starting from 0 and 1, which can be used as wait times in a loop.
+        The Fibonacci sequence is generated until max_wait_time is reached (default: infinity)
+
+        Returns:
+          int: The next Fibonacci number in the sequence.
+
+        """
+        a, b = (0, 1)
+        while True:
+            yield a
+            if b <= max_wait_time:
+                (a, b) = (b, a + b)
+
+    def decorator_with_retries(func):
+        """
+        A function wrapper that handles rate limit and internal server errors with retry functionality.
+        Not intended for direct use - use the top level function, with_retries.
+        """
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            """
+            A function wrapper that handles rate limit and internal server errors with retry functionality.
+            Not intended for direct use - use the top level function, with_retries.
+            """
+            sleep_time_generator = fibonacci_wait_times()
+            while True:
+                try:
+                    return func(*args, *kwargs)
+                except RateLimitError as e:
+                    sleep_time = next(sleep_time_generator)
+                    logger.debug(e)
+                    logger.error(
+                        f"{e.status_code} Rate Limit Error: {e.message} \nSleeping {sleep_time}s before retrying"
+                    )
+                    time.sleep(sleep_time)
+                    continue
+                except InternalServerError as e:
+                    sleep_time = (
+                        next(sleep_time_generator) + 30
+                    )  # Let's chill a bit longer for 5XX errors
+                    logger.debug(e)
+                    logger.error(
+                        f"{e.status_code} Internal Server Error: {e.message} \nSleeping {sleep_time}s before retrying"
+                    )
+                    time.sleep(sleep_time)
+                    continue
+
+        return wrapper
+
+    return decorator_with_retries
 
 
+@with_retries(max_wait_time=60)
 def ask_claude(new_message, messages: list = []):
     """
     Sends a new message to Claude and returns the response.
@@ -65,7 +116,7 @@ def ask_claude(new_message, messages: list = []):
         tuple: A tuple containing the response from Claude and the updated list of messages.
     """
     new_messages = messages + [new_message]
-    response = client.beta.tools.messages.create(
+    response: ToolsBetaMessage = client.beta.tools.messages.create(
         model=CLAUDE_MODEL,
         max_tokens=MAX_TOKENS,
         system=SYSTEM_PROMPT,
@@ -85,17 +136,17 @@ def download_captions(video_url):
     )
     res = ydl.extract_info(video_url, download=False)
     if res["requested_subtitles"] and res["requested_subtitles"]["en"]:
-        # print(res['requested_subtitles']['en']['url'])
+        logger.debug(res["requested_subtitles"]["en"]["url"])
         response = requests.get(res["requested_subtitles"]["en"]["url"], stream=True)
-        # print(response.text)
+        logger.debug(response.text)
         return response.text
     else:
-        print("This Youtube Video does not have any english captions")
+        logger.error("This Youtube Video does not have any english captions")
         return None
 
 
 def main(video_url):
-    captions = download_captions(video_url)
+    captions = download_captions(video_url=video_url)
     if not captions:
         return
     new_message = {
@@ -105,19 +156,21 @@ def main(video_url):
             {"type": "text", "text": "Can you summarize the video?"},
         ],
     }
-    response, _ = ask_claude_with_retries(new_message)
+    response, _ = ask_claude(new_message)
 
     print(response.content[0].text)
 
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Error: Please provide a valid YouTube URL as a command line argument.")
+        logger.error(
+            "Error: Please provide a valid YouTube URL as a command line argument."
+        )
         sys.exit(1)
 
-    video_url = sys.argv[1]
+    video_url: str = sys.argv[1]
     if not video_url.startswith("https://www.youtube.com/watch?v="):
-        print("Error: Invalid YouTube URL format.")
+        logger.error("Error: Invalid YouTube URL format.")
         sys.exit(1)
 
-    main(video_url)
+    main(video_url=video_url)
